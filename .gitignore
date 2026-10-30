@@ -1,2 +1,13 @@
 # Course files that are not part of the game
 practica3.md
+borrador_respuestas_en.md
+video_script_en.md
+
+# Deliverables submitted separately (PDF, Word, video, screenshots)
+Perez_*.pdf
+Perez_*.docx
+Perez_*.mp4
+screenshots/
+
+# Word lock files
+~$*

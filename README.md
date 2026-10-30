@@ -4,6 +4,10 @@ A short puzzle platformer level for Practice 3 of the Game Design course. You co
 
 The level has four sections, from a safe start to a final test. It takes less than 2 minutes to finish.
 
+## Play online
+
+Play it in Chrome at https://zacariasworks.github.io/PushBlock/
+
 ## Controls
 
 * Left and Right arrows, or A and D: move

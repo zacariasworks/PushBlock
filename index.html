@@ -1,0 +1,1134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Push Block</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --scrim: rgba(22, 27, 51, 0.55);
+    --panel: #eef1f8;
+    --ink: #1c2140;
+    --ink-soft: #4b5373;
+    --key: #ffffff;
+    --key-edge: #b9c0d4;
+    --accent: #ff9a3c;
+    --goal: #1fb3a6;
+    --flash: rgba(229, 72, 77, 0.38);
+    --page: #161b33;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --scrim: rgba(10, 13, 28, 0.6);
+      --panel: #1f2547;
+      --ink: #eef1f8;
+      --ink-soft: #a9b1cc;
+      --key: #2c3361;
+      --key-edge: #141838;
+      --goal: #2fd6c6;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --scrim: rgba(10, 13, 28, 0.6);
+    --panel: #1f2547;
+    --ink: #eef1f8;
+    --ink-soft: #a9b1cc;
+    --key: #2c3361;
+    --key-edge: #141838;
+    --goal: #2fd6c6;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: var(--page);
+    font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+  }
+  #game { position: fixed; inset: 0; }
+  #game canvas { display: block; }
+
+  .screen {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: var(--scrim);
+  }
+  .screen.hidden { display: none; }
+  .card {
+    max-width: 520px;
+    width: 100%;
+    background: var(--panel);
+    border-radius: 18px;
+    padding: 36px 36px 30px;
+    text-align: center;
+    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+  }
+  .logo {
+    display: inline-flex;
+    gap: 6px;
+    margin: 0 0 6px;
+  }
+  .logo span {
+    display: inline-block;
+    font-weight: 700;
+    font-size: clamp(2rem, 7vw, 3.1rem);
+    line-height: 1;
+    padding: 10px 12px 8px;
+    border-radius: 8px;
+    background: #e3e7ee;
+    color: #2f3446;
+    box-shadow: inset 0 -5px 0 #9aa1b0;
+    position: relative;
+  }
+  .logo span::before, .logo span::after {
+    content: "";
+    position: absolute;
+    top: -7px;
+    width: 28%;
+    height: 7px;
+    border-radius: 3px 3px 0 0;
+    background: #e3e7ee;
+  }
+  .logo span::before { left: 14%; }
+  .logo span::after { right: 14%; }
+  .logo span.push { background: var(--accent); color: #3a1f05; box-shadow: inset 0 -5px 0 #c46a1c; }
+  .logo span.push::before, .logo span.push::after { background: var(--accent); }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px 22px;
+    margin: 28px 0 24px;
+    padding: 0;
+    list-style: none;
+    font-size: 1rem;
+    color: var(--ink-soft);
+  }
+  .controls li { display: inline-flex; align-items: center; gap: 8px; }
+  kbd {
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.95rem;
+    min-width: 2.1em;
+    padding: 4px 9px 5px;
+    border-radius: 7px;
+    background: var(--key);
+    color: var(--ink);
+    box-shadow: inset 0 -3px 0 var(--key-edge), 0 0 0 1px var(--key-edge);
+  }
+  .start {
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.15rem;
+    color: var(--ink);
+  }
+
+  h2 {
+    margin: 0 0 22px;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--goal);
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 0 0 26px;
+  }
+  .stats div { display: flex; flex-direction: column-reverse; gap: 2px; }
+  .stats dt { font-size: 0.95rem; color: var(--ink-soft); }
+  .stats dd { margin: 0; font-size: 1.7rem; font-weight: 600; }
+
+  #flash {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: var(--flash);
+    opacity: 0;
+    transition: opacity 0.08s linear;
+  }
+  #flash.on { opacity: 1; }
+  #error {
+    position: fixed;
+    left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: #e5484d;
+    color: #fff;
+    font: 600 0.95rem/1.4 "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+    z-index: 10;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #flash { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <div id="game"></div>
+  <div id="flash"></div>
+  <div id="error" hidden></div>
+
+  <section id="title" class="screen" aria-label="Title screen">
+    <div class="card">
+      <h1 class="logo"><span class="push">Push</span><span>Block</span></h1>
+      <ul class="controls">
+        <li><kbd>←</kbd><kbd>→</kbd> Move</li>
+        <li><kbd>Space</kbd> Push</li>
+        <li><kbd>R</kbd> Restart section</li>
+      </ul>
+      <p class="start">Press any key or click to start</p>
+    </div>
+  </section>
+
+  <section id="end" class="screen hidden" aria-label="End screen">
+    <div class="card">
+      <h2>Level complete</h2>
+      <dl class="stats">
+        <div><dt>Time</dt><dd id="stat-time">0 s</dd></div>
+        <div><dt>Resets</dt><dd id="stat-resets">0</dd></div>
+        <div><dt>Coin</dt><dd id="stat-coin">No</dd></div>
+      </dl>
+      <p class="start">Press Enter or click to play again</p>
+    </div>
+  </section>
+
+  <script>
+    // Show any error on screen so the problem is easy to find
+    window.addEventListener('error', e => {
+      const box = document.getElementById('error');
+      box.hidden = false;
+      box.textContent = 'Error: ' + (e.message || 'could not load a script') + (e.lineno ? ' (line ' + e.lineno + ')' : '');
+    }, true);
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    if (!window.THREE) {
+      const box = document.getElementById('error');
+      box.hidden = false;
+      box.textContent = 'Could not load Three.js. Check your internet connection.';
+    }
+  </script>
+  <script src="level.js"></script>
+  <script>
+    if (!window.LEVEL) {
+      const box = document.getElementById('error');
+      box.hidden = false;
+      box.textContent = 'Could not load level.js.';
+    }
+  </script>
+  <script>
+// ============================================================
+//  PUSH BLOCK game logic (Three.js r128)
+// ============================================================
+
+// ---------- FEEL CONSTANTS (tiles and seconds) ----------
+const WALK_SPEED       = 4;     // tiles/s when walking
+const PLAYER_GRAVITY   = 30;    // tiles/s² when falling
+const MAX_FALL_SPEED   = 15;    // tiles/s, top falling speed
+const STEP_DELAY       = 0.1;   // s pushing against a step before climbing it
+const STEP_UP_TIME     = 0.08;  // s of the animation when climbing a step
+const PUSH_DURATION    = 0.15;  // s a block takes to slide one tile
+const BLOCK_GRAVITY    = 30;    // tiles/s² for a falling block
+const PATROL_SPEED     = 1.5;   // tiles/s for the patrol
+const PUSH_BUFFER      = 0.12;  // s of leeway if Space is pressed before touching the block
+const PUSH_REACH       = 0.12;  // max distance to the block, in tiles, to push it
+const CRUSH_MARGIN     = 0.25;  // extra tiles so a falling block can crush an enemy
+const RESET_TIME       = 0.15;  // s of the flash before restart (must be under 1 s)
+const CAMERA_WIDTH     = 13;    // tiles visible across the screen
+const CAMERA_LOOKAHEAD = 3;     // tiles the camera looks ahead to the right
+const CAMERA_LERP      = 0.1;   // follow smoothness (0 to 1)
+const CAMERA_TILT      = 11;    // degrees the camera looks down to show the top of the pieces
+
+// ---------- SIZES ----------
+const PLAYER_W = 0.7, PLAYER_H = 0.85;
+const ENEMY_W  = 0.8, ENEMY_H  = 0.8;
+const EPS = 1e-4;
+
+// ---------- COLORS ----------
+// Light colors move, dark colors are fixed, red is danger, and what glows can be picked up.
+const COLORS = {
+  skyTop:     0x2a3157,
+  skyBottom:  0x161b33,
+  ground:     0x4b5266,
+  groundEdge: 0x2f3446,
+  groundTop:  0x5f677e,
+  base:       0x383e52,
+  block:      0xe3e7ee,
+  blockEdge:  0x9aa1b0,
+  blockStud:  0xf4f6fa,
+  lava:       0xff4a2a,
+  lavaDeep:   0xb3200f,
+  lavaHot:    0xffb03a,
+  player:     0xff9a3c,
+  playerDark: 0xc46a1c,
+  robotTread: 0x2b2f3d,
+  robotWheel: 0x8a90a0,
+  robotVisor: 0x161b33,
+  led:        0xfff3c4,
+  eye:        0x161b33,
+  enemy:      0x5b3a7a,
+  enemyDark:  0x3a2452,
+  enemyEye:   0xff5a5f,
+  coin:       0xf7c948,
+  goal:       0x2fd6c6,
+  far1:       0x252c50,
+  far2:       0x2a3259,
+};
+
+// ============================================================
+//  READING THE MAP
+// ============================================================
+const L = window.LEVEL;
+const ROWS = L.map.length;
+const COLS = L.map[0].length;
+L.map.forEach((row, i) => {
+  if (row.length !== COLS) console.error(`Map row ${i} is ${row.length} tiles long, but it should be ${COLS}`);
+});
+const charAt = (c, y) => L.map[ROWS - 1 - y][c]; // y = 0 is the bottom row
+
+const solid = [];          // solid[y * COLS + c]
+const lavaPits = [];         // { c, y, covered, mesh }
+const blocks = [];         // { c, y, state, fromC, t, fy, vy, group }
+let playerStart = null;
+let guard = null, patrol = null, coin = null, goal = null;
+
+for (let y = 0; y < ROWS; y++) {
+  for (let c = 0; c < COLS; c++) {
+    const ch = charAt(c, y);
+    solid[y * COLS + c] = ch === '#';
+    if (ch === '^') lavaPits.push({ c, y, covered: false });
+    if (ch === 'B') blocks.push({ c, y, state: 'rest', fromC: c, t: 0, fy: y, vy: 0 });
+    if (ch === '@') playerStart = { c, y };
+    if (ch === 'G') guard = { kind: 'guard', x: c + (1 - ENEMY_W) / 2, y, alive: true, dir: 1, deathT: 0 };
+    if (ch === 'P') patrol = { kind: 'patrol', x: c + (1 - ENEMY_W) / 2, y, alive: true, dir: -1, deathT: 0 };
+    if (ch === 'C') coin = { c, y, taken: false, buried: false };
+    if (ch === 'O') goal = { c, y };
+  }
+}
+const enemies = [guard, patrol].filter(Boolean);
+const checkpointCols = L.checkpoints.map(t => t - 1);
+const patrolMinX = L.patrol.from - 1;
+const patrolMaxX = L.patrol.to - ENEMY_W;
+
+// ============================================================
+//  GRID QUERIES
+// ============================================================
+function isStatic(c, y) {
+  if (c < 0 || c >= COLS || y < 0) return true;
+  if (y >= ROWS) return false;
+  return solid[y * COLS + c];
+}
+function blockAtCell(c, y) {
+  for (const b of blocks) {
+    if (b.state === 'rest' && b.c === c && b.y === y) return b;
+    if (b.state === 'sliding' && b.y === y && (b.c === c || b.fromC === c)) return b;
+    if (b.state === 'falling' && b.c === c &&
+        (Math.floor(b.fy + EPS) === y || Math.floor(b.fy + 1 - EPS) === y)) return b;
+  }
+  return null;
+}
+function restingBlockAt(c, y) {
+  return blocks.find(b => b.state === 'rest' && b.c === c && b.y === y) || null;
+}
+const isSolid = (c, y) => isStatic(c, y) || !!blockAtCell(c, y);
+const lavaAt = (c, y) => lavaPits.find(s => s.c === c && s.y === y && !s.covered) || null;
+const overlap = (ax, ay, aw, ah, bx, by, bw, bh) =>
+  ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+
+// ============================================================
+//  THREE.JS SCENE, CAMERA, LIGHTS AND PIECES
+//  Everything is built with geometry in code. There are no external images.
+// ============================================================
+const container = document.getElementById('game');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -60, 60);
+scene.add(camera);
+let viewW = CAMERA_WIDTH, viewH = 7;
+
+// Lights: cold sky above, purple bounce light below and a "sun" that casts shadows
+scene.add(new THREE.HemisphereLight(0xe4eaff, 0x3b3550, 0.72));
+const sun = new THREE.DirectionalLight(0xffffff, 0.62);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -14; sun.shadow.camera.right = 14;
+sun.shadow.camera.top = 9; sun.shadow.camera.bottom = -9;
+sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 60;
+sun.shadow.camera.updateProjectionMatrix();
+sun.shadow.bias = -0.0008;
+scene.add(sun, sun.target);
+
+// Helpers to build pieces
+const geoCache = {}, matCache = {};
+function box(w, h, d) {
+  const k = `b${w}_${h}_${d}`;
+  return geoCache[k] || (geoCache[k] = new THREE.BoxGeometry(w, h, d));
+}
+function lambert(color, emissive = 0x000000) {
+  const k = `l${color}_${emissive}`;
+  return matCache[k] || (matCache[k] = new THREE.MeshLambertMaterial({ color, emissive }));
+}
+function basic(color) {
+  const k = `m${color}`;
+  return matCache[k] || (matCache[k] = new THREE.MeshBasicMaterial({ color }));
+}
+function mesh(geo, mat, x, y, z, parent = scene, shadows = true) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  m.castShadow = shadows;
+  m.receiveShadow = shadows;
+  parent.add(m);
+  return m;
+}
+const STUD = new THREE.CylinderGeometry(0.15, 0.15, 0.12, 16);
+function addStuds(parent, cx, topY, mat) {
+  for (const dx of [-0.24, 0.24]) for (const dz of [-0.24, 0.24]) mesh(STUD, mat, cx + dx, topY + 0.06, dz, parent);
+}
+
+// Soft halo for things that glow (coin and goal), drawn on a canvas
+function haloTexture() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 64;
+  const g = cv.getContext('2d');
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.4, 'rgba(255,255,255,0.35)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(cv);
+}
+const HALO = haloTexture();
+function halo(color, size, parent) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: HALO, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+  s.scale.set(size, size, 1);
+  parent.add(s);
+  return s;
+}
+
+// ---------- Background: sky, stars and far towers with parallax ----------
+const skyGeo = new THREE.PlaneGeometry(1, 1);
+const skyTopColor = new THREE.Color(COLORS.skyTop), skyBottomColor = new THREE.Color(COLORS.skyBottom);
+skyGeo.setAttribute('color', new THREE.Float32BufferAttribute([
+  skyTopColor.r, skyTopColor.g, skyTopColor.b, skyTopColor.r, skyTopColor.g, skyTopColor.b,
+  skyBottomColor.r, skyBottomColor.g, skyBottomColor.b, skyBottomColor.r, skyBottomColor.g, skyBottomColor.b,
+], 3));
+const sky = new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColors: true, depthWrite: false }));
+sky.position.z = -50;
+sky.renderOrder = -2;
+camera.add(sky);
+
+let seed = 7;
+const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+const starPos = [];
+for (let i = 0; i < 70; i++) starPos.push((rand() - 0.5) * 30, rand() * 9 - 1, -45);
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
+const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+  color: 0xc9d2ff, size: 2, sizeAttenuation: false, transparent: true, opacity: 0.6, depthWrite: false,
+}));
+stars.renderOrder = -1;
+camera.add(stars);
+
+const skyline = new THREE.Group();
+for (let x = -16; x < COLS + 20; ) {
+  const w = 1.5 + Math.floor(rand() * 3), h = 1.5 + rand() * 4.5;
+  mesh(box(w, h, 1), basic(rand() < 0.5 ? COLORS.far1 : COLORS.far2), x + w / 2, -1 + h / 2, 0, skyline, false);
+  x += w + rand() * 1.2;
+}
+skyline.position.z = -14;
+scene.add(skyline);
+
+// ---------- Fixed ground: dark bricks with studs on top ----------
+for (let y = 0; y < ROWS; y++) {
+  for (let c = 0; c < COLS; c++) {
+    if (!isStatic(c, y)) continue;
+    mesh(box(0.97, 0.97, 1), lambert(y === 0 ? COLORS.base : COLORS.ground), c + 0.5, y + 0.5, 0);
+    if (!isStatic(c, y + 1) && y > 0) addStuds(scene, c + 0.5, y + 0.985, lambert(COLORS.groundTop));
+  }
+}
+
+// ---------- Lava: the only red thing in the level. It glows, bubbles and lights up the pit ----------
+const BUBBLE = new THREE.SphereGeometry(0.06, 10, 8);
+const lavaFx = [];
+for (const s of lavaPits) {
+  const g = new THREE.Group();
+  mesh(box(0.98, 0.55, 0.98), lambert(COLORS.lavaDeep, 0x6a0a04), s.c + 0.5, s.y + 0.275, 0, g, false);
+  mesh(box(0.98, 0.04, 0.98), basic(COLORS.lava), s.c + 0.5, s.y + 0.57, 0, g, false);
+  const glow = halo(COLORS.lava, 1.8, g);
+  glow.position.set(s.c + 0.5, s.y + 0.75, 0.4);
+  const bubbles = [];
+  for (let i = 0; i < 4; i++) {
+    const b = mesh(BUBBLE, basic(COLORS.lavaHot), s.c + 0.2 + rand() * 0.6, s.y + 0.59, (rand() - 0.5) * 0.7, g, false);
+    b.userData = { phase: rand(), speed: 0.5 + rand() * 0.6 };
+    bubbles.push(b);
+  }
+  scene.add(g);
+  s.mesh = g;
+  // The light stays outside the group. When the lava is covered, the light turns off
+  // and the number of lights does not change.
+  const light = new THREE.PointLight(COLORS.lava, 0.9, 3.2);
+  light.position.set(s.c + 0.5, s.y + 1.1, 0.9);
+  scene.add(light);
+  lavaFx.push({ s, glow, bubbles, light, emberT: rand() * 0.5 });
+}
+
+// ---------- Pushable blocks: light colored, with studs, like loose pieces ----------
+for (const b of blocks) {
+  const g = new THREE.Group();
+  mesh(box(0.96, 0.96, 0.96), lambert(COLORS.block), 0, 0, 0, g);
+  addStuds(g, 0, 0.48, lambert(COLORS.blockStud));
+  scene.add(g);
+  b.group = g;
+}
+
+// ---------- Enemies: dark purple, with red glowing eyes ----------
+const CONE_SMALL = new THREE.ConeGeometry(0.08, 0.18, 8);
+function buildEnemy(e) {
+  const g = new THREE.Group();
+  const body = new THREE.Group();
+  g.add(body);
+  e.eyes = new THREE.Group();
+  if (e.kind === 'guard') {
+    mesh(box(0.7, 0.52, 0.5), lambert(COLORS.enemy), 0, 0.26, 0, body);
+    mesh(box(0.6, 0.26, 0.46), lambert(COLORS.enemyDark), 0, 0.65, 0, body);
+    for (const dx of [-0.2, 0.2]) mesh(CONE_SMALL, lambert(COLORS.enemyDark), dx, 0.86, 0, body);
+    for (const dx of [-0.13, 0.13]) mesh(box(0.1, 0.07, 0.02), basic(COLORS.enemyEye), dx, 0, 0, e.eyes, false);
+    e.eyes.position.set(0, 0.63, 0.24);
+  } else {
+    const shell = mesh(new THREE.SphereGeometry(0.4, 24, 16), lambert(COLORS.enemy), 0, 0.4, 0, body);
+    shell.scale.set(1, 0.9, 0.85);
+    for (const dx of [-0.2, 0.2]) mesh(box(0.16, 0.1, 0.22), lambert(COLORS.enemyDark), dx, 0.05, 0, body);
+    for (const dx of [-0.18, 0, 0.18]) mesh(CONE_SMALL, lambert(COLORS.enemyDark), dx, 0.79, 0, body);
+    for (const dx of [-0.12, 0.12]) mesh(box(0.1, 0.1, 0.02), basic(COLORS.enemyEye), dx, 0, 0, e.eyes, false);
+    e.eyes.position.set(0, 0.45, 0.36);
+  }
+  body.add(e.eyes);
+  scene.add(g);
+  e.group = g;
+  e.body = body;
+}
+enemies.forEach(buildEnemy);
+
+// ---------- Coin: gold, it spins and has a halo ----------
+let coinGroup = null, coinHalo = null, coinDisc = null;
+if (coin) {
+  coinGroup = new THREE.Group();
+  coinHalo = halo(COLORS.coin, 1.0, coinGroup);
+  coinDisc = mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.07, 28), lambert(COLORS.coin, 0x6b4a00), 0, 0, 0, coinGroup);
+  coinDisc.rotation.x = Math.PI / 2;
+  coinGroup.position.set(coin.c + 0.5, coin.y + 0.42, 0);
+  scene.add(coinGroup);
+}
+
+// ---------- Goal: a transparent turquoise orb that lights up the area around it ----------
+let goalGroup = null, goalHalo = null;
+if (goal) {
+  goalGroup = new THREE.Group();
+  goalHalo = halo(COLORS.goal, 1.7, goalGroup);
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.34, 32, 24), new THREE.MeshPhongMaterial({
+    color: COLORS.goal, emissive: 0x0b5e57, shininess: 90, transparent: true, opacity: 0.82,
+  }));
+  goalGroup.add(orb);
+  mesh(new THREE.SphereGeometry(0.09, 12, 8), basic(0xe8fffc), -0.12, 0.12, 0.27, goalGroup, false);
+  const glow = new THREE.PointLight(COLORS.goal, 0.7, 4.5);
+  glow.position.set(0, 0, 0.8);
+  goalGroup.add(glow);
+  goalGroup.position.set(goal.c + 0.5, goal.y + 0.5, 0);
+  scene.add(goalGroup);
+}
+
+// ---------- Player: orange cube robot with one LED eye ----------
+// Tracks and bumpers make it read as a "pushing machine". Orange keeps it from looking like a block.
+const player = { x: 0, y: 0, vy: 0, facing: 1, grounded: true, stepTimer: 0, stepOffset: 0, squashT: 0, turn: 1, lastX: 0, sway: 0 };
+const playerGroup = new THREE.Group();
+const pBody = new THREE.Group();
+playerGroup.add(pBody);
+const WHEEL = new THREE.CylinderGeometry(0.065, 0.065, 0.02, 14);
+for (const dz of [-0.17, 0.17]) {
+  mesh(box(0.62, 0.2, 0.12), lambert(COLORS.robotTread), 0, 0.11, dz, pBody);
+  for (const dx of [-0.2, 0, 0.2]) {
+    const w = mesh(WHEEL, lambert(COLORS.robotWheel), dx, 0.11, dz + Math.sign(dz) * 0.065, pBody);
+    w.rotation.x = Math.PI / 2;
+  }
+}
+mesh(box(0.58, 0.34, 0.44), lambert(COLORS.player), 0, 0.39, 0, pBody);
+mesh(box(0.34, 0.12, 0.02), lambert(COLORS.playerDark), 0, 0.37, 0.225, pBody);
+for (const dx of [-0.33, 0.33]) mesh(box(0.08, 0.2, 0.3), lambert(COLORS.playerDark), dx, 0.38, 0, pBody);
+mesh(box(0.16, 0.05, 0.16), lambert(COLORS.robotTread), 0, 0.585, 0, pBody);
+
+const head = new THREE.Group();
+head.position.y = 0.73;
+pBody.add(head);
+mesh(box(0.48, 0.26, 0.4), lambert(COLORS.player), 0, 0, 0, head);
+mesh(box(0.4, 0.13, 0.02), basic(COLORS.robotVisor), 0, 0.01, 0.205, head, false);
+const ledEye = mesh(box(0.11, 0.07, 0.02), basic(COLORS.led), 0, 0.01, 0.217, head, false);
+const ledHalo = halo(COLORS.led, 0.38, head);
+ledHalo.position.set(0, 0.01, 0.25);
+
+const antenna = new THREE.Group();
+antenna.position.y = 0.13;
+head.add(antenna);
+mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.16, 8), lambert(COLORS.robotWheel), 0, 0.08, 0, antenna);
+const antennaTip = mesh(new THREE.SphereGeometry(0.035, 10, 8), basic(COLORS.led), 0, 0.18, 0, antenna, false);
+scene.add(playerGroup);
+
+// ---------- Particles for feedback ----------
+const PART = box(0.09, 0.09, 0.09);
+const particles = [];
+function burst(x, y, color, n, speed, up, gravity = 14, mat = null) {
+  for (let i = 0; i < n; i++) {
+    const m = mesh(PART, mat || lambert(color), x + (rand() - 0.5) * 0.4, y, (rand() - 0.5) * 0.4, scene, false);
+    particles.push({ m, g: gravity, vx: (rand() - 0.5) * speed * 2, vy: rand() * up + 0.5, vz: (rand() - 0.5) * 1.5, t: 0, life: 0.45 + rand() * 0.3 });
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.t += dt;
+    p.vy -= p.g * dt;
+    p.m.position.x += p.vx * dt; p.m.position.y += p.vy * dt; p.m.position.z += p.vz * dt;
+    p.m.scale.setScalar(Math.max(0.01, 1 - p.t / p.life));
+    if (p.t >= p.life) { scene.remove(p.m); particles.splice(i, 1); }
+  }
+}
+const fx = {
+  dust:  (x, y) => burst(x, y + 0.05, 0xb8bfcc, 8, 1.6, 1),
+  crush: (x, y) => { burst(x, y, COLORS.enemy, 16, 3, 3); burst(x, y, 0xffffff, 5, 2, 2.5); },
+  coin:  (x, y) => burst(x, y, COLORS.coin, 12, 2, 3.5),
+  death: (x, y) => burst(x, y, COLORS.player, 16, 3, 3),
+  goal:  (x, y) => burst(x, y, COLORS.goal, 30, 3.5, 4),
+  steam: (x, y) => { burst(x, y, 0xd8dde6, 10, 1.2, 2.2, -1.5); burst(x, y, COLORS.lavaHot, 8, 2, 3, 14, basic(COLORS.lavaHot)); },
+  ember: (x, y) => burst(x, y, COLORS.lavaHot, 1, 0.3, 0.6, -0.6, basic(COLORS.lavaHot)),
+  splash: (x, y) => burst(x, y, COLORS.lava, 18, 2.5, 3.5, 14, basic(COLORS.lava)),
+};
+const squash = () => { player.squashT = 0.14; };
+
+// ============================================================
+//  SOUND (Web Audio, no files)
+// ============================================================
+let actx = null;
+function initAudio() {
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; }
+  }
+  if (actx && actx.state === 'suspended') actx.resume();
+}
+function tone(freq, dur, type = 'square', vol = 0.12, slideTo = null, delay = 0) {
+  if (!actx) return;
+  const t0 = actx.currentTime + delay;
+  const osc = actx.createOscillator();
+  const gain = actx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  gain.gain.setValueAtTime(vol, t0);
+  gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  osc.connect(gain).connect(actx.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.02);
+}
+const sfx = {
+  step:  () => tone(300, 0.04, 'triangle', 0.05),
+  push:  () => tone(200, 0.09, 'square', 0.08, 130),
+  wait:  () => tone(520, 0.05, 'sine', 0.06),
+  bump:  () => tone(110, 0.06, 'triangle', 0.1),
+  thud:  () => tone(120, 0.14, 'sine', 0.3, 45),
+  crush: () => { tone(320, 0.18, 'sawtooth', 0.1, 60); tone(80, 0.2, 'sine', 0.25, 40) },
+  coin:  () => { tone(988, 0.07, 'square', 0.07); tone(1319, 0.14, 'square', 0.07, null, 0.07) },
+  death: () => tone(420, 0.22, 'sawtooth', 0.1, 70),
+  sizzle: () => { tone(1400, 0.3, 'sawtooth', 0.03, 300); tone(90, 0.18, 'sine', 0.2, 50); },
+  goal:  () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, 'square', 0.07, null, i * 0.09)),
+};
+
+// ============================================================
+//  STATE, SECTIONS AND RESTART
+// ============================================================
+let state = 'title';           // title | play | dying | win
+let stateTimer = 0;
+let elapsed = 0, resets = 0;
+let checkpoint = 0;
+let snapshot = null;
+let pushPressedAt = -1;
+let clock = 0;
+
+function groundYAt(c) {
+  for (let y = ROWS; y >= 1; y--) if (!isSolid(c, y) && isSolid(c, y - 1)) return y;
+  return 1;
+}
+function takeSnapshot(cpIndex) {
+  const c = checkpointCols[cpIndex];
+  snapshot = {
+    cpIndex,
+    spawn: { c, y: groundYAt(c) },
+    blocks: blocks.map(b => ({ c: b.c, y: b.y })),
+    lavaPits: lavaPits.map(s => s.covered),
+    enemies: enemies.map(e => ({ x: e.x, dir: e.dir, alive: e.alive })),
+    coin: coin ? { taken: coin.taken, buried: coin.buried } : null,
+  };
+}
+function restoreSnapshot() {
+  const s = snapshot;
+  blocks.forEach((b, i) => {
+    Object.assign(b, { c: s.blocks[i].c, y: s.blocks[i].y, state: 'rest', fromC: s.blocks[i].c, t: 0, fy: s.blocks[i].y, vy: 0 });
+  });
+  lavaPits.forEach((sp, i) => { sp.covered = s.lavaPits[i]; sp.mesh.visible = !sp.covered; });
+  enemies.forEach((e, i) => {
+    Object.assign(e, s.enemies[i], { deathT: 0 });
+    e.group.visible = e.alive;
+    e.body.scale.set(1, 1, 1);
+  });
+  if (coin) { Object.assign(coin, s.coin); coinGroup.visible = !coin.taken && !coin.buried; }
+  player.x = s.spawn.c + (1 - PLAYER_W) / 2;
+  player.y = s.spawn.y;
+  player.vy = 0; player.facing = 1; player.grounded = true;
+  player.stepTimer = 0; player.stepOffset = 0;
+  player.squashT = 0; player.turn = 1; player.lastX = player.x; player.sway = 0;
+  playerGroup.visible = true;
+  pushPressedAt = -1;
+  checkpoint = s.cpIndex;
+}
+function resetLevel() {
+  // Put everything back as it is in the original map
+  blocks.forEach(b => { b.c = b.fromC = b.origC; b.y = b.fy = b.origY; b.state = 'rest'; b.t = 0; b.vy = 0; });
+  lavaPits.forEach(s => { s.covered = false; s.mesh.visible = true; });
+  enemies.forEach(e => { e.x = e.origX; e.dir = e.origDir; e.alive = true; e.deathT = 0; e.group.visible = true; e.body.scale.set(1, 1, 1); });
+  if (coin) { coin.taken = false; coin.buried = false; coinGroup.visible = true; }
+  checkpoint = 0;
+  takeSnapshot(0);
+  snapshot.spawn = { c: playerStart.c, y: playerStart.y };
+  restoreSnapshot();
+  elapsed = 0; resets = 0;
+}
+blocks.forEach(b => { b.origC = b.c; b.origY = b.y; });
+enemies.forEach(e => { e.origX = e.x; e.origDir = e.dir; });
+
+function die() {
+  if (state !== 'play') return;
+  state = 'dying';
+  stateTimer = 0;
+  sfx.death();
+  const inLava = lavaPits.some(s => !s.covered && overlap(player.x, player.y, PLAYER_W, PLAYER_H, s.c, s.y, 1, 0.6));
+  if (inLava) { fx.splash(player.x + PLAYER_W / 2, player.y + 0.5); sfx.sizzle(); }
+  fx.death(player.x + PLAYER_W / 2, player.y + 0.4);
+  playerGroup.visible = false;
+  flashEl.classList.add('on');
+}
+function win() {
+  state = 'win';
+  sfx.goal();
+  fx.goal(goal.c + 0.5, goal.y + 0.5);
+  const secs = elapsed.toFixed(1);
+  document.getElementById('stat-time').textContent = `${secs} s`;
+  document.getElementById('stat-resets').textContent = resets;
+  document.getElementById('stat-coin').textContent = coin && coin.taken ? 'Yes' : 'No';
+  endEl.classList.remove('hidden');
+}
+
+// ============================================================
+//  INPUT
+// ============================================================
+const keys = { left: false, right: false };
+const titleEl = document.getElementById('title');
+const endEl = document.getElementById('end');
+const flashEl = document.getElementById('flash');
+
+window.addEventListener('keydown', e => {
+  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) e.preventDefault();
+  if (e.repeat && e.code === 'Space') return;
+  initAudio();
+
+  if (state === 'title') {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    titleEl.classList.add('hidden');
+    resetLevel();
+    state = 'play';
+    return;
+  }
+  if (state === 'win') {
+    if (e.code === 'Enter' || e.code === 'Space') {
+      endEl.classList.add('hidden');
+      resetLevel();
+      state = 'play';
+    }
+    return;
+  }
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+  if (e.code === 'Space') pushPressedAt = clock;
+  if (e.code === 'KeyR' && state === 'play') { resets++; restoreSnapshot(); }
+});
+window.addEventListener('keyup', e => {
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+});
+window.addEventListener('blur', () => { keys.left = keys.right = false; });
+titleEl.addEventListener('click', () => {
+  initAudio();
+  if (state !== 'title') return;
+  titleEl.classList.add('hidden');
+  resetLevel();
+  state = 'play';
+});
+endEl.addEventListener('click', () => {
+  if (state !== 'win') return;
+  endEl.classList.add('hidden');
+  resetLevel();
+  state = 'play';
+});
+
+// ============================================================
+//  PLAYER
+// ============================================================
+function spannedCols(x) {
+  return [Math.floor(x + EPS), Math.floor(x + PLAYER_W - EPS)];
+}
+function spannedRows(y) {
+  return [Math.floor(y + EPS), Math.floor(y + PLAYER_H - EPS)];
+}
+
+function tryPush() {
+  if (!player.grounded) return 'no';
+  const r = Math.round(player.y);
+  const d = player.facing;
+  const front = d > 0 ? Math.floor(player.x + PLAYER_W + PUSH_REACH) : Math.floor(player.x - PUSH_REACH);
+  const b = restingBlockAt(front, r);
+  if (!b) return 'no';
+  const dist = d > 0 ? front - (player.x + PLAYER_W) : player.x - (front + 1);
+  if (dist > PUSH_REACH + EPS) return 'no';
+  const target = front + d;
+  if (isSolid(target, r)) return 'blocked';
+  b.state = 'sliding';
+  b.fromC = b.c;
+  b.c = target;
+  b.t = 0;
+  player.stepTimer = 0;
+  sfx.push();
+  return 'pushed';
+}
+
+function updatePlayer(dt) {
+  const dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+  if (dir !== 0) player.facing = dir;
+
+  // Push. If Space was pressed a little before contact, it still counts.
+  if (pushPressedAt >= 0) {
+    const res = tryPush();
+    if (res === 'pushed') pushPressedAt = -1;
+    else if (res === 'blocked') { sfx.bump(); pushPressedAt = -1; }
+    else if (clock - pushPressedAt > PUSH_BUFFER) pushPressedAt = -1;
+  }
+
+  // Horizontal movement and climbing one step.
+  // There is no control in the air. The player falls straight down, like a LEGO figure you let go of.
+  if (dir !== 0 && player.grounded) {
+    let nx = player.x + dir * WALK_SPEED * dt;
+    const front = dir > 0 ? Math.floor(nx + PLAYER_W - EPS) : Math.floor(nx + EPS);
+    const [r0, r1] = spannedRows(player.y);
+    let blocked = false;
+    for (let r = r0; r <= r1; r++) if (isSolid(front, r)) blocked = true;
+
+    if (blocked) {
+      const clampX = dir > 0 ? front - PLAYER_W : front + 1;
+      const row = Math.round(player.y);
+      const frontBlock = blockAtCell(front, row);
+      const [c0, c1] = spannedCols(player.x);
+      const headClear = !isSolid(c0, row + 1) && !isSolid(c1, row + 1);
+      const oneHigh = player.grounded && isSolid(front, row) && !isSolid(front, row + 1) && headClear &&
+                      (!frontBlock || frontBlock.state === 'rest') && pushPressedAt < 0;
+      if (oneHigh) {
+        player.stepTimer += dt;
+        if (player.stepTimer >= STEP_DELAY) {
+          player.y = row + 1;
+          player.stepOffset = -1;
+          player.stepTimer = 0;
+        } else nx = clampX;
+      } else {
+        player.stepTimer = 0;
+        nx = clampX;
+      }
+    } else player.stepTimer = 0;
+    player.x = nx;
+  } else player.stepTimer = 0;
+
+  // Gravity. There is no jump, only falling.
+  const [c0, c1] = spannedCols(player.x);
+  const yi = Math.round(player.y);
+  const onInteger = Math.abs(player.y - yi) < 1e-3;
+  if (onInteger && (isSolid(c0, yi - 1) || isSolid(c1, yi - 1))) {
+    player.y = yi; player.vy = 0; player.grounded = true;
+  } else {
+    player.grounded = false;
+    player.vy = Math.max(player.vy - PLAYER_GRAVITY * dt, -MAX_FALL_SPEED);
+    const ny = player.y + player.vy * dt;
+    const row = Math.floor(ny);
+    if (isSolid(c0, row) || isSolid(c1, row)) {
+      if (player.vy < -3) squash();
+      player.y = row + 1; player.vy = 0; player.grounded = true;
+    } else player.y = ny;
+  }
+
+  if (player.stepOffset < 0) player.stepOffset = Math.min(0, player.stepOffset + dt / STEP_UP_TIME);
+
+  // Hazards
+  const px = player.x + 0.08, py = player.y + 0.05, pw = PLAYER_W - 0.16, ph = PLAYER_H - 0.1;
+  for (const s of lavaPits) {
+    if (!s.covered && overlap(px, py, pw, ph, s.c + 0.08, s.y, 0.84, 0.5)) return die();
+  }
+  for (const e of enemies) {
+    if (e.alive && overlap(px, py, pw, ph, e.x + 0.08, e.y, ENEMY_W - 0.16, ENEMY_H - 0.08)) return die();
+  }
+  for (const b of blocks) {
+    if (b.state === 'falling' && overlap(px, py, pw, ph, b.c + 0.05, b.fy, 0.9, 0.9)) return die();
+  }
+
+  // Coin and goal
+  if (coin && !coin.taken && !coin.buried &&
+      overlap(player.x, player.y, PLAYER_W, PLAYER_H, coin.c + 0.25, coin.y + 0.15, 0.5, 0.5)) {
+    coin.taken = true; coinGroup.visible = false; sfx.coin(); fx.coin(coin.c + 0.5, coin.y + 0.4);
+  }
+  if (goal && overlap(player.x, player.y, PLAYER_W, PLAYER_H, goal.c + 0.2, goal.y + 0.1, 0.6, 0.8)) win();
+}
+
+// ============================================================
+//  BLOCKS
+// ============================================================
+function supported(b) {
+  return isStatic(b.c, b.y - 1) || blocks.some(o => o !== b && o.state === 'rest' && o.c === b.c && o.y === b.y - 1);
+}
+function crushCheck(b) {
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    if (overlap(b.c, b.fy, 1, 1, e.x - CRUSH_MARGIN, e.y, ENEMY_W + CRUSH_MARGIN * 2, ENEMY_H)) {
+      e.alive = false; e.deathT = 0.001; sfx.crush(); fx.crush(e.x + ENEMY_W / 2, e.y + 0.4);
+    }
+  }
+}
+function updateBlocks(dt) {
+  for (const b of blocks) {
+    if (b.state === 'sliding') {
+      b.t += dt / PUSH_DURATION;
+      if (b.t >= 1) { b.t = 1; b.state = 'rest'; b.fromC = b.c; }
+    }
+    if (b.state === 'rest' && !supported(b)) {
+      b.state = 'falling'; b.fy = b.y; b.vy = 0;
+    }
+    if (b.state === 'falling') {
+      b.vy = Math.min(b.vy + BLOCK_GRAVITY * dt, 20);
+      const ny = b.fy - b.vy * dt;
+      const row = Math.floor(ny);
+      crushCheck({ c: b.c, fy: ny });
+      if (isStatic(b.c, row) || restingBlockAt(b.c, row)) {
+        b.y = row + 1; b.fy = b.y; b.vy = 0; b.state = 'rest'; b.fromC = b.c;
+        const s = lavaAt(b.c, b.y);
+        if (s) { s.covered = true; s.mesh.visible = false; sfx.sizzle(); fx.steam(b.c + 0.5, b.y + 0.6); }
+        else { sfx.thud(); fx.dust(b.c + 0.5, b.y); }
+        if (coin && !coin.taken && coin.c === b.c && coin.y === b.y) { coin.buried = true; coinGroup.visible = false; }
+      } else b.fy = ny;
+    }
+  }
+}
+const anyBlockMoving = () => blocks.some(b => b.state !== 'rest');
+
+// ============================================================
+//  ENEMIES
+// ============================================================
+function updateEnemies(dt) {
+  if (patrol && patrol.alive) {
+    let nx = patrol.x + patrol.dir * PATROL_SPEED * dt;
+    const front = patrol.dir > 0 ? Math.floor(nx + ENEMY_W - EPS) : Math.floor(nx + EPS);
+    if (nx < patrolMinX || nx > patrolMaxX || isSolid(front, patrol.y)) {
+      patrol.dir *= -1;
+      nx = Math.min(Math.max(patrol.x, patrolMinX), patrolMaxX);
+    }
+    patrol.x = nx;
+  }
+  for (const e of enemies) {
+    if (!e.alive && e.deathT > 0) {
+      e.deathT += dt;
+      e.body.scale.set(1 + e.deathT * 1.5, Math.max(0.12, 1 - e.deathT * 6), 1 + e.deathT * 1.5);
+      if (e.deathT > 0.35) { e.group.visible = false; e.deathT = 0; }
+    }
+  }
+}
+
+// ============================================================
+//  SECTIONS
+// ============================================================
+function updateCheckpoints() {
+  const next = checkpoint + 1;
+  if (next >= checkpointCols.length) return;
+  const col = Math.floor(player.x + PLAYER_W / 2);
+  if (col >= checkpointCols[next] && player.grounded && !anyBlockMoving()) {
+    takeSnapshot(next);
+    checkpoint = next;
+  }
+}
+
+// ============================================================
+//  DRAWING AND CAMERA
+// ============================================================
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h);
+  const aspect = w / h;
+  viewW = CAMERA_WIDTH;
+  viewH = viewW / aspect;
+  if (viewH < 6.6) { viewH = 6.6; viewW = viewH * aspect; }
+  camera.left = -viewW / 2; camera.right = viewW / 2;
+  camera.top = viewH / 2; camera.bottom = -viewH / 2;
+  camera.updateProjectionMatrix();
+  sky.scale.set(viewW * 1.6, viewH * 1.8, 1);
+}
+window.addEventListener('resize', resize);
+resize();
+
+function targetCamX() {
+  const want = player.x + PLAYER_W / 2 + CAMERA_LOOKAHEAD;
+  const minX = viewW / 2 - 0.5, maxX = COLS - viewW / 2 + 0.5;
+  return minX > maxX ? COLS / 2 : Math.min(Math.max(want, minX), maxX);
+}
+let camX = 0;
+
+function draw(dt) {
+  // Blocks: they slide when pushed and fall with gravity
+  for (const b of blocks) {
+    let x = b.c, y = b.y;
+    if (b.state === 'sliding') x = b.fromC + (b.c - b.fromC) * b.t;
+    if (b.state === 'falling') y = b.fy;
+    b.group.position.set(x + 0.5, y + 0.5, 0);
+  }
+
+  // Enemies. The guard breathes and the patrol turns toward where it walks.
+  for (const e of enemies) {
+    e.group.position.set(e.x + ENEMY_W / 2, e.y, 0);
+    if (!e.alive) continue;
+    if (e.kind === 'guard') e.body.scale.set(1, 1 + Math.sin(clock * 3) * 0.04, 1);
+    else {
+      e.body.rotation.y += ((e.dir * 0.45) - e.body.rotation.y) * Math.min(1, dt * 10);
+      e.body.position.y = Math.abs(Math.sin(clock * 9)) * 0.035;
+    }
+  }
+
+  if (coinGroup) {
+    coinGroup.rotation.y = clock * 2.2;
+    coinHalo.scale.setScalar(1 + Math.sin(clock * 4) * 0.15);
+    coinGroup.position.y = coin.y + 0.42 + Math.sin(clock * 3) * 0.04;
+  }
+  if (goalGroup) {
+    goalHalo.scale.setScalar(1.7 + Math.sin(clock * 2.5) * 0.2);
+    goalGroup.position.y = goal.y + 0.5 + Math.sin(clock * 2) * 0.06;
+  }
+
+  // Robot: it turns to face its direction, squashes when it lands and climbs steps smoothly
+  player.turn += (player.facing - player.turn) * Math.min(1, dt * 14);
+  pBody.rotation.y = player.turn * 0.6;
+  if (player.squashT > 0) player.squashT = Math.max(0, player.squashT - dt);
+  const sq = Math.sin((player.squashT / 0.14) * Math.PI) * 0.18;
+  pBody.scale.set(1 + sq, 1 - sq, 1 + sq);
+  playerGroup.position.set(player.x + PLAYER_W / 2, player.y + player.stepOffset, 0);
+
+  // The LED looks where the robot goes and blinks, and the antenna sways while it moves
+  ledEye.position.x = player.turn * 0.1;
+  ledHalo.position.x = player.turn * 0.1;
+  ledEye.scale.y = (clock % 3.4) < 0.1 ? 0.15 : 1;
+  const speed = dt > 0 ? (player.x - player.lastX) / dt : 0;
+  player.lastX = player.x;
+  player.sway += (Math.max(-1, Math.min(1, -speed * 0.12)) - player.sway) * Math.min(1, dt * 12);
+  antenna.rotation.z = player.sway * 0.5;
+  head.position.y = 0.73 + Math.sin(clock * 2.6) * 0.012;
+  antennaTip.scale.setScalar(0.85 + Math.sin(clock * 5) * 0.15);
+
+  // Lava: bubbles that grow and pop, a glow that breathes and embers that rise
+  lavaFx.forEach((f, i) => {
+    const on = f.s.mesh.visible;
+    f.light.intensity = on ? 0.8 + Math.sin(clock * 7 + i) * 0.15 : 0;
+    if (!on) return;
+    f.glow.scale.setScalar(1.8 + Math.sin(clock * 2.2 + i) * 0.25);
+    for (const b of f.bubbles) {
+      const t = (clock * b.userData.speed + b.userData.phase) % 1;
+      b.scale.setScalar(Math.max(0.01, Math.sin(t * Math.PI) * 1.3));
+    }
+    f.emberT -= dt;
+    if (f.emberT <= 0) { fx.ember(f.s.c + 0.5, f.s.y + 0.6); f.emberT = 0.35 + rand() * 0.4; }
+  });
+
+  updateParticles(dt);
+
+  // Orthographic camera, tilted to show the top of the pieces
+  const k = 1 - Math.pow(1 - CAMERA_LERP, dt * 60);
+  camX += (targetCamX() - camX) * k;
+  const camY = -0.8 + viewH / 2;
+  const tilt = CAMERA_TILT * Math.PI / 180;
+  camera.position.set(camX, camY + Math.sin(tilt) * 20, Math.cos(tilt) * 20);
+  camera.lookAt(camX, camY, 0);
+  skyline.position.x = camX * 0.55;
+  sun.position.set(camX - 5, camY + 10, 9);
+  sun.target.position.set(camX, camY, 0);
+
+  renderer.render(scene, camera);
+}
+
+// ============================================================
+//  MAIN LOOP
+// ============================================================
+let last = performance.now();
+resetLevel();
+camX = targetCamX();
+
+function loop(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  clock += dt;
+
+  if (state === 'play') {
+    elapsed += dt;
+    updateBlocks(dt);
+    updateEnemies(dt);
+    updatePlayer(dt);
+    if (state === 'play') updateCheckpoints();
+  } else if (state === 'dying') {
+    elapsed += dt;
+    stateTimer += dt;
+    if (stateTimer >= RESET_TIME) {
+      resets++;
+      restoreSnapshot();
+      flashEl.classList.remove('on');
+      state = 'play';
+    }
+  } else if (state === 'title') {
+    updateEnemies(dt);
+  }
+
+  draw(dt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>
